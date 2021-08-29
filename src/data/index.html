@@ -1,0 +1,297 @@
+<!DOCTYPE HTML><html>
+<head>
+  <title>LX790 lawn mower Web</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta content="de" http-equiv="Content-Language" />
+  <meta content="text/html; charset=utf-8" http-equiv="Content-Type" />
+  <link rel="icon" type="image/png" href="robomower.png">
+  <style>
+  html {
+    font-family: Arial, Helvetica, sans-serif;
+    text-align: center;
+  }
+  h1 {
+    font-size: 1.8rem;
+    color: #707070;
+  }
+  h2{
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #143642;
+  }
+  .topnav {
+    overflow: hidden;
+    background-color: #7bea7b;
+  }
+  body {
+    margin: 0;
+  }
+  .content {
+    padding: 30px;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  .card {
+    background-color: #f0f0f0;
+    box-shadow: 2px 2px 12px 1px rgba(140,140,140,.5);
+    padding-top:10px;
+    padding-bottom:20px;
+  }
+  .button {
+    padding: 15px 30px;
+    font-size: 24px;
+    text-align: center;
+    outline: none;
+    color: #fff;
+    background-color: #7bea7b;
+    border: none;
+    border-radius: 5px;
+    box-shadow: 2px 2px #cdcdcd;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: rgba(0,0,0,0);
+   }
+   .buttonSmall{
+    font-size: 15px;   
+   }
+   .button:hover {background-color: #20cf20}
+   .button:active {
+     background-color: #7bea7b;
+     transform: translateY(2px);
+     box-shadow: 0px 0px #cdcdcd;
+   }
+   .buttonred {
+     background-color: #ff5252;
+   }
+   .buttonred:hover {background-color: #ff0000}
+   .segment {
+     font-size: 2.5rem;
+     color:#ff5252;
+     font-weight: bold;
+   }
+   .info {
+     font-size: 1.0rem;
+     color:#808080;
+     text-align: center;
+     vertical-align: middle;
+     padding-bottom: 20px;
+   }
+   .table {
+    margin-left: auto;
+    margin-right: auto;   
+    border: 0;
+    padding: 30px 30px;
+   }
+  </style>
+</head>
+
+<body>
+  <div class="topnav">
+    <h1>LX79x Mähroboter</h1>
+  </div>
+  <div class="content">
+    <div class="card">
+        <table class="table" width="80%" cellpadding="0" cellspacing="0">
+           <tr>
+              <td id="sym1" width="20%"><img id="clock" style="display:block;" width="70%" height="70%" src="clock.png" /></td>
+              <td id="sym2" width="3%"> </td>
+              <td id="sym3" width="20%"> </td>
+              <td id="sym4" width="3%"> </td>
+              <td id="sym5" width="20%"><img id="lock" style="display:block;" width="70%" height="70%" src="unlocked.png" /></td>
+              <td id="sym6" width="3%"> </td>
+              <td id="sym7" width="20%"><img id="bat" style="display:block;" width="100%" height="100%" src="bat_empty.png" /></td>
+           </tr>
+           <tr>
+              <td height="40px"></td>
+           </tr>
+           <tr class="segment">
+              <td id="seg1" width="20%">#</td>
+              <td id="gap1" width="3%"><div style="min-height: 50px;"></div></td>
+              <td id="seg2" width="20%">#</td>
+              <td id="gap2" width="3%">:</td>
+              <td id="seg3" width="20%">#</td>
+              <td id="gap3" width="3%"> </td>
+              <td id="seg4" width="20%">#</td>
+           </tr>
+        </table>
+        
+        <div id="mowerstatus" class="info">---</div>
+      <p>
+        <button name="io" id="b1" class="button">I/O</button>
+        <button name="start" id="b2" class="button">Start &uarr;</button>
+        <button name="home" id="b3" class="button">Home &darr;</button>
+        <button name="ok" id="b4" class="button">Ok</button>
+        <button name="stop" id="b5" class="button buttonred">Stop</button>
+      </p>
+      <p>
+        <button name="startmow" id="b6" class="button">Mähen start</button>
+        <button name="homemow" id="b7" class="button">Zur Ladestation</button>
+      </p>
+      <p>
+        <button name="workzone" id="b8" class="button buttonSmall">Arbeitsbereich</button>
+        <button name="timedate" id="b9" class="button buttonSmall">Zeit, Daum</button>
+      </p>
+    </div>
+  <br>
+  </div>
+  <div>
+    <div id="status" style="font-size:12px; color:grey">---</div>
+  </div>
+
+  <script>
+  var imgBatArr = new Array();
+  var imgLockArr = new Array();
+  var CntWebOut = 0;
+  var LstCntWebOut = 0;
+
+  window.addEventListener('load', onLoad);
+
+  function onLoad(event) 
+  {
+    var i = 0;
+    var imgBatName = ['bat_empty.png', 'bat_low.png', 'bat_mid.png', 'bat_full.png'];
+    var imgBatLock = ['unlocked.png', 'locked.png'];
+
+    console.log('...init');
+    for (i=1; i<=9;i++)
+      initButton('b'+i);
+
+    for (i=0; i<imgBatName.length; i++)
+    {
+      imgBatArr[i] = new Image();
+      imgBatArr[i].src = imgBatName[i];
+    }
+    for (i=0; i<imgBatLock.length; i++)
+    {
+      imgLockArr[i] = new Image();
+      imgLockArr[i].src = imgBatLock[i];
+    }
+
+    ActValues();
+    ActStatus();
+  }
+  function initButton(id)
+  {
+    document.getElementById(id).addEventListener("mousedown",  ActionButtonOn);     
+    document.getElementById(id).addEventListener("mouseup",    ActionButtonOff);     
+    document.getElementById(id).addEventListener("mouseleave", ActionButtonOff);     
+  }
+  function ActionButtonOn() 
+  {
+    var xhr = new XMLHttpRequest();
+    
+    if (this.name === "io")
+    {
+      alert('no function!');
+      return;
+    }
+    
+    //var check = confirm('Wollen Sie diese Seite wirklich sehen?', ); 
+    //
+  	//if (check == false) 
+    //{
+		//  console.log("Hallo" + check);
+	  //}    
+    
+    xhr.open("GET", "/cmd?parm="+this.name+"&value=1", true);
+    xhr.send();
+  }
+  function ActionButtonOff() 
+  {
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "/cmd?parm="+this.name+"&value=0", true);
+    xhr.send();
+  }  
+  function ActValues()
+  {
+    var xhr = new XMLHttpRequest();
+
+    xhr.open('GET', '/values');
+    xhr.onreadystatechange = function()
+    {
+      if (xhr.readyState === 4 && xhr.status === 200 && xhr.responseText.length) 
+      {
+        var resArr = xhr.responseText.split(";");
+        
+        //cnt;seg1;seg2;seg3;seg4;point;lock;clock;bat
+        CntWebOut = resArr[0];
+        document.getElementById("seg1").textContent = resArr[1];
+        document.getElementById("seg2").textContent = resArr[2];
+        document.getElementById("seg3").textContent = resArr[3];
+        document.getElementById("seg4").textContent = resArr[4];
+        document.getElementById("gap2").textContent = resArr[5];
+        document.getElementById("lock").src = imgLockArr[resArr[6]].src;
+        document.getElementById("clock").style.visibility = (resArr[7] == 1 ? 'visible' : 'hidden');
+        if (resArr[8] >= 0)
+        {
+          document.getElementById("bat").style.visibility = 'visible';
+          document.getElementById("bat").src = imgBatArr[resArr[8]].src;
+        }
+        else
+        {
+          document.getElementById("bat").style.visibility = 'hidden';
+        }
+      }
+    }
+    xhr.send();
+    
+    //get Text
+    if (LstCntWebOut != CntWebOut)
+    {
+      var xhrStatus = new XMLHttpRequest();
+      
+      LstCntWebOut = CntWebOut;
+      
+      xhrStatus.open("GET", "/cmd?mowerstatus=0", true);
+      xhrStatus.onreadystatechange = function()
+      {
+        if (xhrStatus.readyState === 4 && xhrStatus.status === 200 && xhrStatus.responseText.length) 
+        {
+          document.getElementById("mowerstatus").textContent = xhrStatus.responseText;
+        }
+      }
+      xhrStatus.send();
+    }
+    var t = setTimeout(ActValues, 100);
+  }
+  function ActStatus()
+  {
+    var xhr = new XMLHttpRequest();
+    var status = document.getElementById("status");
+    
+    xhr.open('GET', '/status');    
+    xhr.onload = function()
+    {
+      if (xhr.readyState === 4) 
+      {
+        if(xhr.status === 200)
+        {
+          if (xhr.responseText.length)
+          {
+            var resArr = xhr.responseText.split(";");
+            
+            status.textContent = "RSSI: "+resArr[0]+" dbm"+
+                                 " Cnt WebOut "+CntWebOut+
+                                 " To Cnt: "+resArr[1]+
+                                 " Err Cnt: "+resArr[2]+
+                                 " Err Lst: "+resArr[3];
+          }
+        }
+        else
+        {
+          console.log("XHRConnection: request failed with status: " + xhr.status);
+          return;
+        }
+      }
+    }
+    xhr.send();
+    var t = setTimeout(ActStatus, 500);
+  }
+  </script>
+</body>
+
+</html>
