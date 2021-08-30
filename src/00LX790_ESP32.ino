@@ -254,8 +254,6 @@ void Web_getCmd(WebServer *svr)
       memcpy(tmpAktDisplay, thExchange.AktDisplay, sizeof tmpAktDisplay);
       xSemaphoreGive(SemMutex);
 
-      strcpy(tmpAktDisplay, "-E8-");
-
       if (thExchange.cmdQueIdx)
       {
         svr->send(200,"text/plain", "bitte warten...");
