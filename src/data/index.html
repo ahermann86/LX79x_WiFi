@@ -182,20 +182,7 @@
   }
   function ActionButtonOn() 
   {
-    var xhr = new XMLHttpRequest();
-    
-    if (this.name === "io")
-    {
-      alert('no function!');
-      return;
-    }
-    
-    //var check = confirm('Wollen Sie diese Seite wirklich sehen?', ); 
-    //
-  	//if (check == false) 
-    //{
-		//  console.log("Hallo" + check);
-	  //}    
+    var xhr = new XMLHttpRequest();   
     
     xhr.open("GET", "/cmd?parm="+this.name+"&value=1", true);
     xhr.send();
@@ -210,7 +197,7 @@
   {
     var xhr = new XMLHttpRequest();
 
-    xhr.open('GET', '/values');
+    xhr.open('GET', '/web');
     xhr.onreadystatechange = function()
     {
       if (xhr.readyState === 4 && xhr.status === 200 && xhr.responseText.length) 
@@ -218,78 +205,35 @@
         var resArr = xhr.responseText.split(";");
         
         //cnt;seg1;seg2;seg3;seg4;point;lock;clock;bat
+        //[cnt];[Display];[point];[lock];[clock];[bat];[rssi dbm];[Cnt_timeout];[Cnt_err];[LstError];[text]
         CntWebOut = resArr[0];
-        document.getElementById("seg1").textContent = resArr[1];
-        document.getElementById("seg2").textContent = resArr[2];
-        document.getElementById("seg3").textContent = resArr[3];
-        document.getElementById("seg4").textContent = resArr[4];
-        document.getElementById("gap2").textContent = resArr[5];
-        document.getElementById("lock").src = imgLockArr[resArr[6]].src;
-        document.getElementById("clock").style.visibility = (resArr[7] == 1 ? 'visible' : 'hidden');
-        if (resArr[8] >= 0)
+        document.getElementById("seg1").textContent = resArr[1][0];
+        document.getElementById("seg2").textContent = resArr[1][1];
+        document.getElementById("seg3").textContent = resArr[1][2];
+        document.getElementById("seg4").textContent = resArr[1][3];
+        document.getElementById("gap2").textContent = resArr[2];
+        document.getElementById("lock").src = imgLockArr[resArr[3]].src;
+        document.getElementById("clock").style.visibility = (resArr[4] == 1 ? 'visible' : 'hidden');
+        if (resArr[5] >= 0)
         {
           document.getElementById("bat").style.visibility = 'visible';
-          document.getElementById("bat").src = imgBatArr[resArr[8]].src;
+          document.getElementById("bat").src = imgBatArr[resArr[5]].src;
         }
         else
         {
           document.getElementById("bat").style.visibility = 'hidden';
         }
+        document.getElementById("status").textContent = "RSSI: "+resArr[6]+" dbm"+
+                                                        " Cnt WebOut "+CntWebOut+
+                                                        " To Cnt: "+resArr[7]+
+                                                        " Err Cnt: "+resArr[8]+
+                                                        " Err Lst: "+resArr[9];
+        document.getElementById("mowerstatus").textContent = resArr[10];
       }
     }
     xhr.send();
-    
-    //get Text
-    if (LstCntWebOut != CntWebOut)
-    {
-      var xhrStatus = new XMLHttpRequest();
-      
-      LstCntWebOut = CntWebOut;
-      
-      xhrStatus.open("GET", "/cmd?mowerstatus=0", true);
-      xhrStatus.onreadystatechange = function()
-      {
-        if (xhrStatus.readyState === 4 && xhrStatus.status === 200 && xhrStatus.responseText.length) 
-        {
-          document.getElementById("mowerstatus").textContent = xhrStatus.responseText;
-        }
-      }
-      xhrStatus.send();
-    }
+
     var t = setTimeout(ActValues, 100);
-  }
-  function ActStatus()
-  {
-    var xhr = new XMLHttpRequest();
-    var status = document.getElementById("status");
-    
-    xhr.open('GET', '/status');    
-    xhr.onload = function()
-    {
-      if (xhr.readyState === 4) 
-      {
-        if(xhr.status === 200)
-        {
-          if (xhr.responseText.length)
-          {
-            var resArr = xhr.responseText.split(";");
-            
-            status.textContent = "RSSI: "+resArr[0]+" dbm"+
-                                 " Cnt WebOut "+CntWebOut+
-                                 " To Cnt: "+resArr[1]+
-                                 " Err Cnt: "+resArr[2]+
-                                 " Err Lst: "+resArr[3];
-          }
-        }
-        else
-        {
-          console.log("XHRConnection: request failed with status: " + xhr.status);
-          return;
-        }
-      }
-    }
-    xhr.send();
-    var t = setTimeout(ActStatus, 500);
   }
   </script>
 </body>
