@@ -38,8 +38,8 @@
 #define BTN_BYTE1_HOME        0x04
 #define BTN_BYTE2_STOP        0xFC
 
-const char* ssid     = "Hermann 12";
-const char* password = "12015706346991059680";
+const char* ssid     = "DEINESSID";
+const char* password = "DEINPASSWORT";
 const char* hostname = "LX790 lawn mower";
 
 WebServer server1(80);
