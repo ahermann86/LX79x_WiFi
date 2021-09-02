@@ -53,8 +53,9 @@ struct
   {"-E8-", "Es dauert zu lange, bis der Robi zur Ladestation zurückkehrt."},
   {"-EE-", "Unbekannter Fehler."},
   {"IdLE", "Warte auf start"},
-  {"|--|", "Mähbereit"},
+  {"|ok|", "Mähbereit"},
   {"|~~|", "Mähen..."},
+  {"|--|", "Mähen...Hindernis..."},
   {nullptr,"not found"}
 };
 

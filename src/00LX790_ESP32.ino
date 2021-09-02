@@ -8,6 +8,7 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include "SPIFFS.h"
+#include <Update.h>
 
 //Hardware  
 #define SDA_PIN_MAINBOARD    33  /*default 21*/
@@ -16,6 +17,7 @@
 #define SCL_PIN_DISPLAY      27
 #define I2C_SLAVE_ADDR        0x27
 #define I2C_DISPLAY_ADDR      0x27
+#define OUT_IO               13
 
 //I2C commands
 #define TYPE_BUTTONS          0x01
@@ -36,8 +38,8 @@
 #define BTN_BYTE1_HOME        0x04
 #define BTN_BYTE2_STOP        0xFC
 
-const char* ssid     = "DEINESSID";
-const char* password = "DEINPASSWORT";
+const char* ssid     = "Hermann 12";
+const char* password = "12015706346991059680";
 const char* hostname = "LX790 lawn mower";
 
 WebServer server1(80);
@@ -116,13 +118,32 @@ void setup()
 
 // Request:   http://MOWERADRESS/status
 // Response:  [rssi dbm];[Cnt_timeout];[Cnt_err];[LstError];
-void Web_aktStatus(WebServer *svr)
+void Web_aktStatusWeb(WebServer *svr)
 {
-  char out[100] = "";
+  char out[400] = "";
+  char statustxt[100] = "";
   long rssi = WiFi.RSSI();
+ 
+ //[cnt];[Display];[point];[lock];[clock];[bat];[rssi dbm];[Cnt_timeout];[Cnt_err];[LstError];[text]
+  xSemaphoreTake(SemMutex, 1);
 
-  xSemaphoreTake(SemMutex, 1);  
-  sprintf(out, "%ld;%d;%d;%d", rssi, thExchange.Cnt_timeout, thExchange.Cnt_err, thExchange.Lst_err);
+  if (thExchange.cmdQueIdx)
+  {
+    sprintf(statustxt, "bitte warten...");
+  }
+  else
+  {
+    strcpy(statustxt, DecodeMsg (thExchange.AktDisplay[1], thExchange.AktDisplay[2]));  
+  }
+  
+  sprintf(out, "%s;%ld;%d;%d;%d;%s", 
+    thExchange.WebOutDisplay, 
+    rssi, 
+    thExchange.Cnt_timeout, 
+    thExchange.Cnt_err, 
+    thExchange.Lst_err,
+    statustxt);
+    
   xSemaphoreGive(SemMutex);
 
   svr->send(200,"text/html", out);
@@ -136,12 +157,11 @@ void Web_aktStatusValues(WebServer *svr)
   long rssi = WiFi.RSSI();
   const char* BatState[] = {"off", "empty", "low", "mid", "full"};
   char point[2] = "";
-
-  xSemaphoreTake(SemMutex, 1);
-
+  
   if (thExchange.point != ' ')
     sprintf(point, "%c", thExchange.point);
-  
+
+  xSemaphoreTake(SemMutex, 1);    
   sprintf(out, "%c%c%s%c%c;%ld;%s;%s",
           thExchange.AktDisplay[0],
           thExchange.AktDisplay[1],
@@ -220,6 +240,10 @@ void Web_getCmd(WebServer *svr)
       {
         if (svr->arg(0) == Buttons[i])
         {
+          if (i==0)
+          {
+            digitalWrite(OUT_IO, val?LOW:HIGH);
+          }
           thExchange.WebInButtonState[i] = val > 0;
           
           if (thExchange.WebInButtonState[i])
@@ -232,42 +256,6 @@ void Web_getCmd(WebServer *svr)
     }
     thExchange.Cnt_timeout = 0;      
     xSemaphoreGive(SemMutex);
-  }
-  else if (svr->argName(0) == "mowerstatus")
-  {
-    if (svr->arg(0).length() > 1)
-    {
-      char buf[svr->arg(0).length() + 1];
-      int offset = 0;
-    
-      if (svr->arg(0).substring(1, 0) == "-")
-        offset -= 1;
-      
-      svr->arg(0).getBytes((unsigned char*)buf, svr->arg(0).length() + 1);
-      svr->send(200,"text/plain", String(DecodeMsg (buf[1+offset], buf[2+offset])));
-    }
-    else
-    {
-      static char tmpAktDisplay[sizeof thExchange.AktDisplay] = "";
-      
-      xSemaphoreTake(SemMutex, 1);
-      memcpy(tmpAktDisplay, thExchange.AktDisplay, sizeof tmpAktDisplay);
-      xSemaphoreGive(SemMutex);
-
-      if (thExchange.cmdQueIdx)
-      {
-        svr->send(200,"text/plain", "bitte warten...");
-        return;
-      }
-      
-      if (!strcmp(tmpAktDisplay, " OFF"))
-        svr->send(200,"text/plain", "off");
-      else if (!strcmp(tmpAktDisplay, "####"))
-        svr->send(200,"text/plain", "---");
-      else
-        svr->send(200,"text/plain", String(DecodeMsg (tmpAktDisplay[1], tmpAktDisplay[2])));
-    }
-    return;
   }
   else
   {
@@ -313,12 +301,58 @@ void Task1( void * pvParameters )
         html.close();
       }
     });
+    pserver[s]->on("/update", HTTP_GET, [=]()
+    {
+      File html = SPIFFS.open("/update.html", "r");
+      if (html)
+      {
+        pserver[s]->sendHeader("Connection", "close");
+        pserver[s]->send(200, "text/html", html.readString());
+        html.close();
+      }
+    });
+    pserver[s]->on("/execupdate", HTTP_POST, [=]() 
+    {
+      pserver[s]->sendHeader("Connection", "close");
+      pserver[s]->send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
+      ESP.restart();
+    }, [=]() 
+    {
+      HTTPUpload& upload = pserver[s]->upload();
+      if (upload.status == UPLOAD_FILE_START) 
+      {
+        Serial.printf("Update: %s\n", upload.filename.c_str());
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) 
+        { //start with max available size
+          Update.printError(Serial);
+        }
+      } else if (upload.status == UPLOAD_FILE_WRITE) 
+      {
+        /* flashing firmware to ESP*/
+        if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) 
+        {
+          Update.printError(Serial);
+        }
+      } 
+      else if (upload.status == UPLOAD_FILE_END) 
+      {
+        if (Update.end(true)) 
+        { //true to set the size to the current progress
+          Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
+        } 
+        else 
+        {
+          Update.printError(Serial);
+        }
+      }
+    });    
     
     pserver[s]->on("/cmd",    HTTP_GET, [=]() {Web_getCmd(pserver[s]);});
-    pserver[s]->on("/status",           [=]() {Web_aktStatus(pserver[s]);});
-    pserver[s]->on("/values",           [=]() {pserver[s]->send(200, "text/plain", thExchange.WebOutDisplay);});
+    pserver[s]->on("/web",              [=]() {Web_aktStatusWeb(pserver[s]);});
     pserver[s]->on("/statval",          [=]() {Web_aktStatusValues(pserver[s]);});
+  
     pserver[s]->begin();
+    //pserver[s]->sendHeader("charset", "utf-8");
   }
 
   while(1)
@@ -350,6 +384,9 @@ void Task0( void * pvParameters )
   uint8_t DatMainboard[LEN_MAINBOARD_MAX] = {0};
   uint8_t Lst_DatMainboard[LEN_MAINBOARD_MAX] = {0};
   uint8_t DisplayRes[LEN_DISPLAY_RES] = {0x01, 0x00, 0x78, 0x00, 0x00, 0x00, 0x00, 0xFB, 0xA9};
+
+  pinMode(OUT_IO, OUTPUT);
+  digitalWrite(OUT_IO, HIGH);
 
   WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
   WiFi.setHostname(hostname);
@@ -526,6 +563,37 @@ void Task0( void * pvParameters )
     //valid data from mainboard?
     if (err)
     {      
+     #if 1 //Debug print
+      {
+        int i = 0;
+        char hex[2] = {0};
+        char buff[(sizeof DatReadBuff)*2 + 1] = {0};
+
+        Serial.print  ("Err Slave MB ret: ");
+        Serial.print  (ret, DEC);
+        Serial.print  (" err: ");
+        Serial.print  (err, DEC);
+        Serial.print  (" Data Read: ");
+        memset(buff, 0, sizeof buff);
+        for (i=0; i<(sizeof DatReadBuff); i++)
+        {
+          sprintf(hex, "%02x", DatReadBuff[i]);
+          strcat(buff, hex);
+        }
+        Serial.print(buff);
+
+        Serial.print (" Data MB: ");
+        memset(buff, 0, sizeof buff);
+        for (i=0; i<(sizeof DatMainboard); i++)
+        {
+          sprintf(hex, "%02x", DatMainboard[i]);
+          strcat(buff, hex);
+        }
+        Serial.print(buff);
+        Serial.println(" ");
+      }
+     #endif
+
       xSemaphoreTake(SemMutex, 1);
       thExchange.Lst_err = err;
       thExchange.Cnt_err++;
@@ -539,9 +607,12 @@ void Task0( void * pvParameters )
     {
       Lst_ButtonReqFromMainboard = millis();
       //send request to read buttons
-      WireMaster.beginTransmission(I2C_DISPLAY_ADDR);
-      WireMaster.write(DatMainboard, LEN_BUTTONS_REQ);
-      WireMaster.endTransmission(true);
+      //if (DatMainboard[0] == TYPE_BUTTONS || DatMainboard[0] == TYPE_UNKNOWN)
+      {
+        WireMaster.beginTransmission(I2C_DISPLAY_ADDR);
+        WireMaster.write(DatMainboard, LEN_BUTTONS_REQ);
+        WireMaster.endTransmission(true);
+      }
     }
     //Timeout or off?
     if (millis() - Lst_ButtonReqFromMainboard > 100)
@@ -559,6 +630,33 @@ void Task0( void * pvParameters )
       Lst_ButtonReqFromMainboard = millis();
 
       WireMaster.flush();
+     #if 1 //Debug print
+      {
+        int i = 0;
+        char hex[2] = {0};
+        char buff[(sizeof DatReadBuff)*2 + 1] = {0};
+        int NotEmpty = 0;
+
+        memset(buff, 0, sizeof buff);
+        for (i=0; i<(sizeof DatReadBuff); i++)
+        {
+          sprintf(hex, "%02x", DatReadBuff[i]);
+          strcat(buff, hex);
+          if (DatReadBuff[i])
+            NotEmpty = 1;
+        }
+        if (NotEmpty)
+        {
+          Serial.print  (" To read: ");
+          Serial.print  (IdxReadBuff);
+          Serial.print  (" proc: ");
+          Serial.print  (ReadBuff_Processed);
+          Serial.print  (" dat: ");
+          Serial.println(buff);
+        }
+      }
+     #endif
+
       WireSlave.flush();
       IdxReadBuff = ReadBuff_Processed = 0;
       memset(DatReadBuff, 0, sizeof DatReadBuff);
@@ -704,11 +802,11 @@ void Task0( void * pvParameters )
         if (DecodeChars_IsRun(&DatMainboard[1]))
           strcpy(thExchange.AktDisplay, "|~~|");
         else if (DecodeChars_IsRunReady(&DatMainboard[1]))
-          strcpy(thExchange.AktDisplay, "|--|");
+          strcpy(thExchange.AktDisplay, "|ok|");
 
         //cnt;seg1;seg2;seg3;seg4;point;lock;clock;bat
         memset(thExchange.WebOutDisplay, 0, sizeof thExchange.WebOutDisplay);
-        sprintf(thExchange.WebOutDisplay, "%d;%c;%c;%c;%c;%c;%d;%d;%d",
+        sprintf(thExchange.WebOutDisplay, "%d;%c%c%c%c;%c;%d;%d;%d",
           CntWebOut,
           thExchange.AktDisplay[0],
           thExchange.AktDisplay[1],
@@ -719,6 +817,7 @@ void Task0( void * pvParameters )
           (DatMainboard[5] & 0x04)?1:0,  //clock
           thExchange.bat);
         xSemaphoreGive(SemMutex);
+        //Serial.println(thExchange.WebOutDisplay);
       }
     }
     delay(1);
