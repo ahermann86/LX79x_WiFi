@@ -15,6 +15,7 @@ Nachrüstung einer WiFi Schnittstelle mit Websteuerung für einen LandXcape LX79
 - Klartextausgabe der Fehlercodes
 - Fernsteuern der Tasten und Funktionen
 - Anbindung über den I2C Bus zwischen Display und Mainboard
+- Wenn der Roboter in der Ladestation steht uns aus ist, kann dieser mit "I/O" eingeschaltet werden
 
 ### Voraussetzungen
 #### Hardware
@@ -113,4 +114,7 @@ Antwort:
 >
 >|--|;-80;mid;Mähen...
 
+##### Update ausführen
+http://MOWERADRESS/update
 
+Damit kann eine .bin Datei auf den ESP32 hochgeladen werden.
