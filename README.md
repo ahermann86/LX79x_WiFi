@@ -33,6 +33,8 @@ Um den ESP32 in den I2C Bus zwischen Mainboard und Display zwischenschalten zu k
   <img src=pic/Schaltplan_Adapter.png height="150"/>  
 </p>
 
+Das Adapterkabel hat eine Gesamtlänge von ca 70cm.
+
 ##### Platine
 Der ESP32 wird auf eine Lochrasterplatine Adaptiert. Die fertige Platine kann dann in dem Batteriefach eingebaut werden.
 <p align="center">
@@ -98,7 +100,7 @@ value=[VALUE]:
 
 >Beispiel - die Taste Start soll 5 Sekunden gedrückt werden:
 >
->http://MOWERADRESS/cmd?parm=start&value=5000*
+>http://MOWERADRESS/cmd?parm=start&value=5000
 
 ##### Zustand Abfragen
 http://MOWERADRESS/statval
