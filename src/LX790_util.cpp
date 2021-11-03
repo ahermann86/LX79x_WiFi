@@ -55,8 +55,8 @@ struct
   {"IdLE", "Warte auf start"},
   {"|ok|", "Mähbereit"},
   {"|~~|", "Mähen..."},
-  {"|--|", "Mähen...Hindernis..."},
-  {nullptr,"not found"}
+  {"----", "Mähen...Hindernis..."},
+  {nullptr,"null"}
 };
 
 char DecodeChar (char raw)
@@ -110,7 +110,7 @@ int DecodeChars_IsRunReady (uint8_t raw[4])
   return 1;
 }
 
-char EncodeSeg (char c)
+uint8_t EncodeSeg (uint8_t c)
 {
   int i = 0;
   
@@ -125,19 +125,19 @@ char EncodeSeg (char c)
   return (0x01 | 0x08 | 0x40);
 }
 
-const char * DecodeMsg (char c1, char c2)
+const char * DecodeMsg (char raw[4])
 {
   int i = 0;
   
   for (i = 0; TblMsg[i].Display; i++)
   {
-    if (TblMsg[i].Display[1] == c1 && TblMsg[i].Display[2] == c2 )
+    if (!memcmp(TblMsg[i].Display, raw, 4))
     {
       return TblMsg[i].Str;
     }
   }
   
-  return "not found";
+  return "...";
 }
 
 //  Landxcape LX790
