@@ -1,0 +1,25 @@
+0.0.1 LX790 (03.11.2021)
+- Initiale Version
+
+0.0.2 LX790 (16.04.2022)
+
+- Debug (serial) per define schaltbar
+- Nur noch eine anstatt drei Webserver Instanzen/Ports
+- Kommentare aktualisiert
+- Nach Versorgung des ESPs wird der IO Taster "gehalten"
+  -> so muss nicht 5 Sekunden läng fürs Einschalten gedrückt gehalten werden
+- Während dem Start wird der Vorgang mit einem "Pxxx" im Display angezeigt, bis der I2C "übernimmt"
+- I2C Kommunikation verbessert
+- Anzeige des Ladezustands korrigiert
+- Reformat Text
+- Zeichen 't' ergänzt
+- Ausgabetexte "beruhigt"
+
+
+... ToDo:
+
+- "OFF" Blinken
+- MQTT und URL Triggerung (Version piccer)
+- Boot up noch etwas unschön
+- Automatische Pineingabe bei bekanntem WLAN
+- IO Tasterabfrage und Ansteuerung zur Unterscheidung ob gedrückt wird oder der ESP nur versorgt wird
