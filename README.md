@@ -116,6 +116,34 @@ Antwort:
 >
 >|--|;-80;mid;Mähen...
 
+##### Beispiel
+Einbindung in FHEM per HTTPMOD:
+
+```
+defmod MRoboter HTTPMOD none 5
+attr MRoboter alias MRoboter
+attr MRoboter event-on-change-reading .*
+attr MRoboter get01-1Name Display
+attr MRoboter get01-2Name RSSI
+attr MRoboter get01-3Name Battery
+attr MRoboter get01-4Name Status
+attr MRoboter get01Decode UTF-8
+attr MRoboter get01Name Ouput
+attr MRoboter get01Poll 1
+attr MRoboter get01Regex (\N+);;(\N+);;(\N+);;(\N+)
+attr MRoboter get01URL http://192.168.2.54:80/statval
+attr MRoboter group Mähroboter
+attr MRoboter room Haus
+attr MRoboter showBody 1
+attr MRoboter stateFormat D: Display WL: RSSI S: Status B: Battery
+```
+
+Eine Aufzeichnung sieht dann so aus:
+
+<p align="center">
+  <img src=pic/LogPlot_mit_FHEM.png/>
+</p>
+
 ##### Update ausführen
 http://MOWERADRESS/update
 
