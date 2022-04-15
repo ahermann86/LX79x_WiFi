@@ -19,18 +19,19 @@ struct
   {'9', 0x01 | 0x02 | 0x04 | 0x08 | 0x20 | 0x40}, 
   {'E', 0x01 | 0x02 | 0x08 | 0x10 | 0x40 },
   {'r', 0x08 | 0x10 },
-  {'o', 0x08 | 0x20 | 0x40 | 0x10},
+  {'o', 0x08 | 0x20 | 0x40 | 0x10},                  //off -> "0"
   {'F', 0x01 | 0x02 | 0x08 | 0x10},
   {'-', 0x08 },
   {'A', 0x01 | 0x02 | 0x04 | 0x08 | 0x10 | 0x20 },
-  {'I', 0x20 | 0x04 }, // special - wie '1'
+  {'I', 0x20 | 0x04 },                               // !! wie '1'
   {'d', 0x04 | 0x08 | 0x10 | 0x20 | 0x40 },
   {'L', 0x02 | 0x10 | 0x40 },
   {'P', 0x01 | 0x02 | 0x04 | 0x08 | 0x10 },
   {'n', 0x10 | 0x08 | 0x20 },
   {'U', 0x02 | 0x04 | 0x10 | 0x20 | 0x40},
-  {'S', 0x01 | 0x02 | 0x08 | 0x20 | 0x40},
+  {'S', 0x01 | 0x02 | 0x08 | 0x20 | 0x40},           // !! wie '5'
   {'b', 0x02 | 0x08 | 0x10 | 0x20 | 0x40},
+  {'t', 0x02 | 0x08 | 0x10 | 0x40 },
   {'H', 0x02 | 0x04 | 0x08 | 0x10 | 0x20 },
   {0, 0 }
 };
@@ -52,10 +53,38 @@ struct
   {"-E7-", "Akkufehler"},
   {"-E8-", "Es dauert zu lange, bis der Robi zur Ladestation zurückkehrt."},
   {"-EE-", "Unbekannter Fehler."},
-  {"IdLE", "Warte auf start"},
+  {"IDLE", "Warte auf Start"},
+  {" OFF", "Ausschalten"},
+  {"STOP", "Gestoppt"},
   {"|ok|", "Mähbereit"},
   {"|~~|", "Mähen..."},
   {"----", "Mähen...Hindernis..."},
+  {nullptr,"null"}
+};
+
+struct
+{
+  const char * Display;
+  const char * Str;
+} const SegmentToLetter[] =
+{
+  {"5toP", "STOP"},
+  {"1dLE", "IDLE"},
+  {"   -", "IDLE"},
+  {"  -1", "IDLE"},
+  {" -1d", "IDLE"},
+  {"-1dL", "IDLE"},
+  {"1dLE", "IDLE"},
+  {"dLE-", "IDLE"},
+  {"LE- ", "IDLE"},
+  {"E-  ", "IDLE"},
+  {"-   ", "IDLE"},
+  {"   0", " OFF"},
+  {"  0F", " OFF"},
+  {" 0FF", " OFF"},
+  {"0FF ", " OFF"},
+  {"0F  ", " OFF"},
+  {"F   ", " OFF"},
   {nullptr,"null"}
 };
 
@@ -86,7 +115,12 @@ int DecodeChars_IsRun (uint8_t raw[4])
     {
       if(raw[i] & 1<<j)
       {
-        cnt++;
+        if(raw[i] != 0x08)
+        {
+          //0x08 ignorieren wg. blinken zwischen "Mähen" und "warte auf Start"
+          //Der mittlere Strich der 7-Segment-Anzeige ist beim Mähen niemals an
+          cnt++;
+        } 
       }
     }
   }
@@ -94,11 +128,12 @@ int DecodeChars_IsRun (uint8_t raw[4])
   return cnt == 1;
 }
 
+
 int DecodeChars_IsRunReady (uint8_t raw[4])
 {
   int i = 0;
-  const uint8_t readyPad[4] = { 0x01|0x02|0x10|0x40,
-                                0x01|0x40,
+  const uint8_t readyPad[4] = { 0x01|0x02|0x10|0x40,     //   _ _ _ _
+                                0x01|0x40,               //  |_ _ _ _|
                                 0x01|0x40,
                                 0x01|0x04|0x20|0x40 };
   
@@ -123,6 +158,21 @@ uint8_t EncodeSeg (uint8_t c)
   }
   
   return (0x01 | 0x08 | 0x40);
+}
+
+const char * LetterOrNumber (char raw[4])
+{ 
+  int i = 0;
+  
+  for (i = 0; SegmentToLetter[i].Display; i++)
+  {
+    if (!memcmp(SegmentToLetter[i].Display, raw, 4))
+    {
+      return SegmentToLetter[i].Str;
+    }
+  }
+  
+  return raw;
 }
 
 const char * DecodeMsg (char raw[4])
@@ -170,11 +220,14 @@ const char * DecodeMsg (char raw[4])
 //    Schloss    0x08
 //    Uhr        0x04
 //    Punkte     0x01 und 0x02
+//    WiFi       0x10
 //
 //    Batterie Gehäuse   0x20
 //    Batterie Str. re   0x60
+//    Batterie Str. mi   0xE0
 //  
-//  BR:    Helligkeit (0x01 bis 0xC9 / 1 - 201)
+//  BR:    Helligkeit (0x01 bis 0xC8 / 1 - 200)
+//    Batterie Str. li   0x01
 //
 //  CS: 2 Byte Checksumme
 //  

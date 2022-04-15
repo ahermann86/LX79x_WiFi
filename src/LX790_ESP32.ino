@@ -10,6 +10,8 @@
 #include "SPIFFS.h"
 #include <Update.h>
 
+#define DEBUG_SERIAL_PRINT    0
+
 //Hardware  
 #define SDA_PIN_MAINBOARD    33  /*default 21*/
 #define SCL_PIN_MAINBOARD    25  /*default 22*/
@@ -42,10 +44,7 @@ const char* ssid     = "DEINESSID";
 const char* password = "DEINPASSWORT";
 const char* hostname = "LX790 lawn mower";
 
-WebServer server1(80);
-WebServer server2(81);
-WebServer server3(82);
-WebServer *pserver[] = { &server1, &server2, &server3, nullptr };
+WebServer server(80);
 
 TaskHandle_t hTask0;   //Hardware: I2C, WiFi...
 TaskHandle_t hTask1;   //Web...
@@ -97,7 +96,7 @@ void setup()
   memset(&thExchange, 0, sizeof thExchange);
 
   xTaskCreatePinnedToCore(
-    Task0,   /* Function to implement the task */
+    Task0,   /* Function to implement the task -> I2C, WiFi*/
     "Task0", /* Name of the task */
     10000,   /* Stack size in words */
     NULL,    /* Task input parameter */
@@ -108,7 +107,7 @@ void setup()
   delay(500);
 
   xTaskCreatePinnedToCore(
-    Task1,   /* Function to implement the task */
+    Task1,   /* Function to implement the task -> Webserver*/
     "Task1", /* Name of the task */
     10000,   /* Stack size in words */
     NULL,    /* Task input parameter */
@@ -142,14 +141,13 @@ char * GetStatustext (void)
   return statustxt; 
 }
 
-// Request:   http://MOWERADRESS/status
-// Response:  [rssi dbm];[Cnt_timeout];[Cnt_err];[LstError];
+// Request:   http://MOWERADRESS/web
+// Response:  [cnt];[Display];[point];[lock];[clock];[bat];[rssi dbm];[Cnt_timeout];[Cnt_err];[LstError];[MowerStatustext]
 void Web_aktStatusWeb(WebServer *svr)
 {
   char out[400] = "";
   long rssi = WiFi.RSSI();
  
- //[cnt];[Display];[point];[lock];[clock];[bat];[rssi dbm];[Cnt_timeout];[Cnt_err];[LstError];[text]
   xSemaphoreTake(SemMutex, 1);
   
   sprintf(out, "%s;%ld;%d;%d;%d;%s", 
@@ -166,7 +164,7 @@ void Web_aktStatusWeb(WebServer *svr)
 }
 
 // Request:   http://MOWERADRESS/statval
-// Response:  [Display];[rssi dbm];[battery];[text]
+// Response:  [DisplayWithDelimiter];[rssi dbm];[batAsText];[MowerStatustext]
 void Web_aktStatusValues(WebServer *svr)
 {
   char out[200] = "";
@@ -201,9 +199,8 @@ void Web_aktStatusValues(WebServer *svr)
 }
 
 //Webcommand examples: 
-// Send command:     http://MOWERADRESS/cmd?parm=start&value=1
-// Get Akt Status:   http://MOWERADRESS/cmd?mowerstatus=0
-// Get Status Text:  http://MOWERADRESS/cmd?mowerstatus=-E6-
+// Send command:         http://MOWERADRESS/cmd?parm=[command/button]&value=[state/time]
+// Send command example: http://MOWERADRESS/cmd?parm=start&value=1
 void Web_getCmd(WebServer *svr)
 {
   if (svr->argName(0) == "parm" &&
@@ -262,7 +259,7 @@ void Web_getCmd(WebServer *svr)
       {
         if (svr->arg(0) == Buttons[i])
         {
-          if (i==0)
+          if (i==0) //OnOff pushbutton
           {
             digitalWrite(OUT_IO, val?LOW:HIGH);
           }
@@ -290,101 +287,93 @@ void Web_getCmd(WebServer *svr)
 
 void Task1( void * pvParameters )
 {
-  int s = 0;
-
-  for (s=0; pserver[s]; s++)
-  {
-    const char * pngs[] = { 
-      "/robomower.png", 
-      "/bat_empty.png" ,"/bat_low.png" ,"/bat_mid.png" ,"/bat_full.png",
-      "/unlocked.png" ,"/locked.png" ,"/clock.png", 
-      nullptr };
-    int p = 0;
-    
-    for (p=0; pngs[p]; p++)
-    {
-      pserver[s]->on(pngs[p], [=]()
-      {
-        File dat = SPIFFS.open(pngs[p], "r");
-        if (dat) 
-        {
-          pserver[s]->send(200, "image/png", dat.readString());
-          dat.close();
-        }
-      });
-    }
-      
-    pserver[s]->on("/", [=]()
-    {
-      File html = SPIFFS.open("/index.html", "r");
-      if (html)
-      {
-        pserver[s]->send(200, "text/html", html.readString());
-        html.close();
-      }
-    });
-    pserver[s]->on("/update", HTTP_GET, [=]()
-    {
-      File html = SPIFFS.open("/update.html", "r");
-      if (html)
-      {
-        pserver[s]->sendHeader("Connection", "close");
-        pserver[s]->send(200, "text/html", html.readString());
-        html.close();
-      }
-    });
-    pserver[s]->on("/execupdate", HTTP_POST, [=]() 
-    {
-      pserver[s]->sendHeader("Connection", "close");
-      pserver[s]->send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
-      ESP.restart();
-    }, [=]() 
-    {
-      HTTPUpload& upload = pserver[s]->upload();
-      if (upload.status == UPLOAD_FILE_START) 
-      {
-        Serial.printf("Update: %s\n", upload.filename.c_str());
-        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) 
-        { //start with max available size
-          Update.printError(Serial);
-        }
-      } else if (upload.status == UPLOAD_FILE_WRITE) 
-      {
-        /* flashing firmware to ESP*/
-        if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) 
-        {
-          Update.printError(Serial);
-        }
-      } 
-      else if (upload.status == UPLOAD_FILE_END) 
-      {
-        if (Update.end(true)) 
-        { //true to set the size to the current progress
-          Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
-        } 
-        else 
-        {
-          Update.printError(Serial);
-        }
-      }
-    });    
-    
-    pserver[s]->on("/cmd",    HTTP_GET, [=]() {Web_getCmd(pserver[s]);});
-    pserver[s]->on("/web",              [=]() {Web_aktStatusWeb(pserver[s]);});
-    pserver[s]->on("/statval",          [=]() {Web_aktStatusValues(pserver[s]);});
+  const char * pngs[] = { 
+    "/robomower.png", 
+    "/bat_empty.png" ,"/bat_low.png" ,"/bat_mid.png" ,"/bat_full.png",
+    "/unlocked.png" ,"/locked.png" ,"/clock.png", 
+    nullptr };
+  int p = 0;
   
-    pserver[s]->begin();
-    //pserver[s]->sendHeader("charset", "utf-8");
+  for (p=0; pngs[p]; p++)
+  {
+    server.on(pngs[p], [=]()
+    {
+      File dat = SPIFFS.open(pngs[p], "r");
+      if (dat) 
+      {
+        server.send(200, "image/png", dat.readString());
+        dat.close();
+      }
+    });
   }
+    
+  server.on("/", [=]()
+  {
+    File html = SPIFFS.open("/index.html", "r");
+    if (html)
+    {
+      server.send(200, "text/html", html.readString());
+      html.close();
+    }
+  });
+  server.on("/update", HTTP_GET, [=]()
+  {
+    File html = SPIFFS.open("/update.html", "r");
+    if (html)
+    {
+      server.sendHeader("Connection", "close");
+      server.send(200, "text/html", html.readString());
+      html.close();
+    }
+  });
+  server.on("/execupdate", HTTP_POST, [=]() 
+  {
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
+    ESP.restart();
+  }, [=]() 
+  {
+    HTTPUpload& upload = server.upload();
+    if (upload.status == UPLOAD_FILE_START) 
+    {
+      Serial.printf("Update: %s\n", upload.filename.c_str());
+      if (!Update.begin(UPDATE_SIZE_UNKNOWN)) 
+      { //start with max available size
+        Update.printError(Serial);
+      }
+    } else if (upload.status == UPLOAD_FILE_WRITE) 
+    {
+      /* flashing firmware to ESP*/
+      if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) 
+      {
+        Update.printError(Serial);
+      }
+    } 
+    else if (upload.status == UPLOAD_FILE_END) 
+    {
+      if (Update.end(true)) 
+      { //true to set the size to the current progress
+        Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
+      } 
+      else 
+      {
+        Update.printError(Serial);
+      }
+    }
+  });    
+  
+  server.on("/cmd",    HTTP_GET, [=]() {Web_getCmd(&server);});
+  server.on("/web",              [=]() {Web_aktStatusWeb(&server);});
+  server.on("/statval",          [=]() {Web_aktStatusValues(&server);});
+
+  server.begin();
+  //server.sendHeader("charset", "utf-8");
 
   while(1)
   {
     if (WiFi.status() == WL_CONNECTED)
     {
-      for (s=0; pserver[s]; s++)
-      {
-        pserver[s]->handleClient();
-      }
+      server.handleClient();
     }
     delay(10);
   }
@@ -394,6 +383,7 @@ void Task0( void * pvParameters )
 {
   TwoWireSlave WireSlave  = TwoWireSlave(0); //ESP32 <-> Motherboard
   TwoWire      WireMaster = TwoWire(1);      //ESP32 <-> Display/Buttons
+  int ProcInit = 1;
   int WiFi_WasConnected = 0;
   unsigned long Lst_WiFi_Status = 0;
   //CRC16 crc;
@@ -407,8 +397,9 @@ void Task0( void * pvParameters )
   uint8_t Lst_DatMainboard[LEN_MAINBOARD_MAX] = {0};
   uint8_t DisplayRes[LEN_DISPLAY_RES] = {0x01, 0x00, 0x78, 0x00, 0x00, 0x00, 0x00, 0xFB, 0xA9};
 
+  memset(DatMainboard, 0, sizeof DatMainboard);
   pinMode(OUT_IO, OUTPUT);
-  digitalWrite(OUT_IO, HIGH);
+  digitalWrite(OUT_IO, LOW);
 
   WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
   WiFi.setHostname(hostname);
@@ -427,10 +418,18 @@ void Task0( void * pvParameters )
   //crc.setPolynome(0x1021);
   //crc.setStartXOR(0xFFFF);
   //crc.setEndXOR(0xFFFF);
-
+  
   while(1)
   {
     int err = 0;
+    
+    //after power up
+    if (ProcInit && ( (millis() > 10*2000)             /*Timeout*/ ||
+                       DatMainboard[LEN_DISPLAY_RES-1] /*Komm. ok*/ ) ) 
+    {
+      ProcInit = 0;
+      digitalWrite(OUT_IO, HIGH);
+    }
 
     //check WLAN state
     if (WiFi_WasConnected)
@@ -463,7 +462,7 @@ void Task0( void * pvParameters )
     }
     
     //get state/response from buttons
-    while (1)
+    while (!ProcInit)
     {
       if (WireMaster.requestFrom(I2C_DISPLAY_ADDR, LEN_DISPLAY_RES) != LEN_DISPLAY_RES)
         break;
@@ -584,8 +583,8 @@ void Task0( void * pvParameters )
 
     //valid data from mainboard?
     if (err)
-    {      
-     #if 1 //Debug print
+    {   
+     #if(DEBUG_SERIAL_PRINT  == 1)
       {
         int i = 0;
         char hex[2] = {0};
@@ -624,18 +623,62 @@ void Task0( void * pvParameters )
       IdxReadBuff = ReadBuff_Processed = 0;
       memset(DatReadBuff, 0, sizeof DatReadBuff);
     }
+    
+    if (ProcInit && !(millis()%100))
+    {
+      uint8_t InitDisplay[LEN_MAINBOARD_MAX] = {0};
+      char num[4] = {0};
+      uint16_t calc_crc = 0xFFFF;
+
+      sprintf(num, "%03lu", millis()/100);
+
+      InitDisplay[0] = TYPE_DISPLAY;
+      InitDisplay[1] = EncodeSeg('P');
+      InitDisplay[2] = EncodeSeg((uint8_t)num[0]);
+      InitDisplay[3] = EncodeSeg((uint8_t)num[1]);
+      InitDisplay[4] = EncodeSeg((uint8_t)num[2]);
+      InitDisplay[5] = (WiFi.status() == WL_CONNECTED)?0x10:0;  //WiFi Symbol
+      InitDisplay[6] = 0xC8;
+
+      calc_crc = crc16(InitDisplay, LEN_DISPLAY_RES-2, 0x1021, 0xFFFF, 0xFFFF, false, false);
+      InitDisplay[LEN_DISPLAY_RES-2] = calc_crc & 0xff;
+      InitDisplay[LEN_DISPLAY_RES-1] = calc_crc>>8;
+
+      WireMaster.beginTransmission(I2C_DISPLAY_ADDR);
+      WireMaster.write(InitDisplay, LEN_DISPLAY_RES);
+      WireMaster.endTransmission(true);
+    }
 
     if (DatMainboard[0])
     {
+      size_t size = 0;
+      
       Lst_ButtonReqFromMainboard = millis();
-      //send request to read buttons
-      //if (DatMainboard[0] == TYPE_BUTTONS || DatMainboard[0] == TYPE_UNKNOWN)
+
+      switch (DatMainboard[0])
+      {
+        //case TYPE_DISPLAY:
+        //  size = LEN_DISPLAY_RES;
+        //  break;
+        case TYPE_BUTTONS:
+          size = LEN_BUTTONS_REQ;
+          break;
+        case LEN_UNKNOWN_REQ:      //04 01 15 3E
+          size = 4;
+          break;
+        case LEN_UNKNOWN_INIT_REQ: //05 01 01 83 fb
+          size = 5;
+          break;
+      }
+      
+      if (size)
       {
         WireMaster.beginTransmission(I2C_DISPLAY_ADDR);
-        WireMaster.write(DatMainboard, LEN_BUTTONS_REQ);
+        WireMaster.write(DatMainboard, size);
         WireMaster.endTransmission(true);
       }
     }
+    
     //Timeout or off?
     if (millis() - Lst_ButtonReqFromMainboard > 100)
     {
@@ -652,7 +695,7 @@ void Task0( void * pvParameters )
       Lst_ButtonReqFromMainboard = millis();
 
       WireMaster.flush();
-     #if 1 //Debug print
+     #if(DEBUG_SERIAL_PRINT  == 1)
       {
         int i = 0;
         char hex[2] = {0};
@@ -780,20 +823,22 @@ void Task0( void * pvParameters )
       }
     }
     else if (DatMainboard[0] == TYPE_DISPLAY)
-    {      
-      if (DatMainboard[1]||DatMainboard[5]) //valid or just forced from timeout
+    {
+      static unsigned long Lst_bat_charge = 0;
+      
+      if (DatMainboard[LEN_DISPLAY_RES-1]) //valid or just forced from timeout
       {
         WireMaster.beginTransmission(I2C_DISPLAY_ADDR);
         WireMaster.write(DatMainboard, LEN_DISPLAY_RES);
         WireMaster.endTransmission(true);
       }
 
-      if (memcmp(Lst_DatMainboard, DatMainboard, sizeof Lst_DatMainboard))
+      if ( memcmp(Lst_DatMainboard, DatMainboard, sizeof Lst_DatMainboard) ||
+          (Lst_bat_charge && (millis() - Lst_bat_charge > 1000)) )
       {
         static unsigned int CntWebOut = 0;
         static int Lst_bat = -1;
         static unsigned long Lst_low_is_off = 0;
-        static unsigned long Lst_bat_charge = 0;
         uint8_t batraw = 0;
         int bat = -1;
         int batWeb = -1;
@@ -836,7 +881,15 @@ void Task0( void * pvParameters )
         
         xSemaphoreTake(SemMutex, 1);
         
-        thExchange.batCharge = millis() - Lst_bat_charge < 1000;
+        if (Lst_bat_charge && (millis() - Lst_bat_charge < 1000))
+        {
+          thExchange.batCharge = 1;
+        }
+        else
+        {
+          thExchange.batCharge = 0;
+          Lst_bat_charge = 0;
+        }
 
         thExchange.point = ' ';
         if (DatMainboard[5] & 0x02)
@@ -858,7 +911,9 @@ void Task0( void * pvParameters )
         if (thExchange.batCharge && thExchange.AktDisplay[0] == 0)
           strcpy(thExchange.AktDisplay, "Chrg");
 
-        //cnt;seg1;seg2;seg3;seg4;point;lock;clock;bat
+        //reformat
+        strcpy(thExchange.AktDisplay, LetterOrNumber(thExchange.AktDisplay));
+        //cnt;seg1seg2seg3seg4;point;lock;clock;bat
         memset(thExchange.WebOutDisplay, 0, sizeof thExchange.WebOutDisplay);
         sprintf(thExchange.WebOutDisplay, "%d;%c%c%c%c;%c;%d;%d;%d",
           CntWebOut,
