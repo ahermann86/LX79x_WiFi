@@ -43,22 +43,22 @@ struct
   const char * Str;
 } const TblMsg[] =
 {
-  {"-F1-", "Regenverzögerung aktiviert."},
-  {"-E1-", "Der Robi befindet sich außerhalb des Funktionsbereichs."},
-  {"-E2-", "Radmotor blockiert."},
-  {"-E3-", "Messer blockiert."},
-  {"-E4-", "Der Robi steckt fest."},
-  {"-E5-", "Der Robi wird hochgehoben."},
-  {"-E6-", "Der Robi wird hochgehoben."},
-  {"-E7-", "Akkufehler"},
-  {"-E8-", "Es dauert zu lange, bis der Robi zur Ladestation zurückkehrt."},
-  {"-EE-", "Unbekannter Fehler."},
-  {"IDLE", "Warte auf Start"},
-  {" OFF", "Ausschalten"},
-  {"STOP", "Gestoppt"},
-  {"|ok|", "Mähbereit"},
-  {"|~~|", "Mähen..."},
-  {"----", "Mähen...Hindernis..."},
+  {"-F1-", "Rain delay activated"},
+  {"-E1-", "Outside boundary wire"},
+  {"-E2-", "Wheel motor blocked"},
+  {"-E3-", "Mower motor blocked"},
+  {"-E4-", "Robot blocked"},
+  {"-E5-", "Robot was lifted"},
+  {"-E6-", "Robot was lifted"},
+  {"-E7-", "Battery failure"},
+  {"-E8-", "It takes too long to return to the charging station"},
+  {"-EE-", "Unknown error"},
+  {"IDLE", "Idle"},
+  {" OFF", "Power off"},
+  {"STOP", "Stopped"},
+  {"|ok|", "Ready to mow"},
+  {"|~~|", "Mowing..."},
+  {"----", "Mowing... Obstacle..."},
   {nullptr,"null"}
 };
 
@@ -118,7 +118,7 @@ int DecodeChars_IsRun (uint8_t raw[4])
         if(raw[i] != 0x08)
         {
           //0x08 ignorieren wg. blinken zwischen "Mähen" und "warte auf Start"
-          //Der mittlere Strich der 7-Segment-Anzeige ist beim Mähen niemals an
+          // The middle line of the segment display is never on during mowing
           cnt++;
         } 
       }
@@ -231,14 +231,14 @@ const char * DecodeMsg (char raw[4])
 //
 //  CS: 2 Byte Checksumme
 //  
-//  ###### Taster
+//  ###### Buttons
 //  
 //  Master / write -> 01 01 E0 C1
-//  Master / read  <- 01 01 78 00 00 00 00 5B EC	<- Taster "ok"
-//  Master / read  <- 01 04 78 00 00 00 00 5A AF	<- Taster "Home / runter"
-//  Master / read  <- 01 02 78 00 00 00 00 BB 22	<- Taster "Start / hoch"
-//  Master / read  <- 01 00 78 00 00 00 00 FB A9	<- Taster "Power"             0x78: 01111000
-//  Master / read  <- 01 00 FC 00 00 00 00 2D 02	<- Taster "Stop" (Öffner!)    0xFC: 11111100
+//  Master / read  <- 01 01 78 00 00 00 00 5B EC	<- Button "ok"
+//  Master / read  <- 01 04 78 00 00 00 00 5A AF	<- Button "Home / runter"
+//  Master / read  <- 01 02 78 00 00 00 00 BB 22	<- Button "Start / hoch"
+//  Master / read  <- 01 00 78 00 00 00 00 FB A9	<- Button "Power"             0x78: 01111000
+//  Master / read  <- 01 00 FC 00 00 00 00 2D 02	<- Button "Stop" (Öffner!)    0xFC: 11111100
 //  
 //  ###### Unbekannt
 //  
