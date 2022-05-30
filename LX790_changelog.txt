@@ -1,5 +1,6 @@
-0.0.1 LX790 (03.11.2021)
-- Initiale Version
+0.0.3 LX790 (30.05.2022)
+
+- Anpassung auf Unterstützung für ESP Core Version 2.0.3
 
 0.0.2 LX790 (16.04.2022)
 
@@ -15,6 +16,9 @@
 - Zeichen 't' ergänzt
 - Ausgabetexte "beruhigt"
 
+0.0.1 LX790 (03.11.2021)
+
+- Initiale Version
 
 ... ToDo:
 
