@@ -51,7 +51,7 @@ Um den ESP32 programmieren und flashen zu können, wurde in diesem Projekt die A
 
 ##### Folgende Voraussetzungen müssen dafür geschaffen werden:
 1. Installation der aktuellen Arduino IDE
-2. ESP32 Core installieren (https://randomnerdtutorials.com/installing-the-esp32-board-in-arduino-ide-windows-instructions/)
+2. ESP32 Core installieren (https://docs.espressif.com/projects/arduino-esp32/en/latest/installing.html)
 3. Boardtyp auswählen: 'Werkzeuge->Board->DOIT ESP32 DEVKIT V1'
 4. CRC Bibliothek ergänzen: 'Werkzeuge->Bibliotheken verwalten...->CRC (Rob Tillaart)'
 5. Filesystem Uploader: (https://randomnerdtutorials.com/install-esp32-filesystem-uploader-arduino-ide/)
