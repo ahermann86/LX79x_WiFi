@@ -24,6 +24,7 @@ bool TwoWireSlave::begin(int sda, int scl, int address)
   i2c_config_t config;
   esp_err_t res = ESP_OK;
   
+  memset(&config, 0, sizeof config);
   config.sda_io_num = gpio_num_t(sda);
   config.sda_pullup_en = GPIO_PULLUP_ENABLE;
   config.scl_io_num = gpio_num_t(scl);

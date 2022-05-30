@@ -413,7 +413,7 @@ void Task0( void * pvParameters )
     Serial.println(F("I2C slave init failed"));
     while(1);
   }
-  WireMaster.begin(SDA_PIN_DISPLAY, SCL_PIN_DISPLAY, 100000);
+  WireMaster.begin(SDA_PIN_DISPLAY, SCL_PIN_DISPLAY, 100000UL);
 
   //crc.setPolynome(0x1021);
   //crc.setStartXOR(0xFFFF);
