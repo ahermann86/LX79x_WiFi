@@ -1,5 +1,5 @@
 # LX79x Mähroboter WiFi Erweiterung mit ESP32
-
+b
 Nachrüstung einer WiFi Schnittstelle mit Websteuerung für einen LandXcape LX79x Mähroboter
 
 *Der Einsatz von diesem Projekt erfolgt auf eigene Gefahr! Der Ersteller kann nicht für Schäden haftbar gemacht werden. Sie können einen Verlust der Garantie und des Supports durch den Hersteller riskieren! Dieses Projekt ist keine offizielle Erweiterung des Roboters!*
